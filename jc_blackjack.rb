@@ -93,7 +93,10 @@ class Deck
   end
 
   def say_cards
-    cardArr = []
+
+    # todo - this is just a debug (and is an artfact at this point - unused)
+
+  cardArr = []
     print "Deck contains #{@cards.count()} cards\n"
     @cards.each do |card|
       cardArr << card.say_card
@@ -176,6 +179,9 @@ class Shoe
   end
 
   def say_cards
+
+    # todo - this is just a debug (and is an artfact at this point - unused)
+
     cardArr = []
     print "Shoe contains #{@cards.count()} cards\n"
     @cards.each do |card|
@@ -347,10 +353,12 @@ class Hand
   # Hand consists of an array of cards - used to track a players hand and is used in determining odds of hitting 21
 
   attr_reader :charlie_val
+  attr_accessor :stay
 
   def initialize()
     @cards = []
     @charlie_val = 999
+    @stay = false
   end
 
   def set_charlie(charlie)
@@ -365,9 +373,14 @@ class Hand
     return @cards.count
   end
 
-  def say_cards
+  def say_cards(player_name=nil)
+
+    if player_name == nil
+      player_name = "Player"
+    end
+
     cardArr = []
-    print "Hand contains #{@cards.count()} cards: "
+    print "#{player_name} hand contains #{@cards.count()} cards: "
     @cards.each do |card|
       cardArr << card.say_card
     end
@@ -415,14 +428,18 @@ class Hand
 
   end
 
-  def say_value
+  def say_value(player_name=nil)
+
+    if player_name == nil
+      player_name = "Player"
+    end
 
     values = get_values(@cards,[0])
 
     foo = values.join(",")
     vStr = values.count() == 1 ? "value" : "values"
 
-    print "Valid hand #{vStr}: #{foo}\n\n"
+    print "#{player_name} hand #{vStr}: #{foo}\n\n"
   end
 
   def is_viable
@@ -487,47 +504,72 @@ print("\n==============\n")
 
 $show_odds = false # todo - do I want to encapsulate this? globals are BAD
 
-def play_hand(shoe)
+def init_hand(shoe, hand)
 
-  hand = Hand.new()
+  # todo - I don't like having to set charlie for every hand!  Should be on game level or something, "odds" as well
+
   hand.set_charlie(shoe.charlie_val)
 
-#  hand.add_card(shoe.deal_card)
-#  hand.add_card(shoe.deal_card)
+  hand.add_card(shoe.deal_card)
+  hand.add_card(shoe.deal_card)
 
+=begin
   while hand.is_viable == true && !shoe.is_bust_possible(hand)
-
-    # note - will "auto-hit" until an actual choice is needed
-
+    # todo: note - will "auto-hit" until an actual choice is needed - used for testing
     hand.add_card(shoe.deal_card)
-
   end
+=end
+
+end
+
+def play_hand(shoe)
+
+  # todo - this is lame!  Should be somewhere else so it's not two lines
+
+  hand = Hand.new()
+  init_hand(shoe, hand)
+
+  dealer = Hand.new()
+  init_hand(shoe, dealer)
+
+  dealer.say_cards("Dealer")
+  dealer.say_value("Dealer")
 
   hand.say_cards
 
-  until hand.is_viable == false
+  until hand.is_viable == false || dealer.is_viable == false || (hand.stay == true && dealer.get_valuez.max >= 17)
 
-    if $show_odds
-      shoe.say_odds(hand)
+    if hand.stay != true
+
+      if $show_odds
+        shoe.say_odds(hand)
+      end
+
+      puts "\nDo you want to (h)it, (s)tay or toggle (o)dds display?"
+      action = gets.chomp
+      puts
+
+      if action == "h"
+
+        puts "You chose to hit, here's your new hand"
+        hand.add_card(shoe.deal_card)
+        hand.say_cards
+        hand.say_value("Player")
+
+      elsif action == "o"
+        $show_odds = !$show_odds
+      elsif action == "q"
+        break
+      else
+        puts "You chose to stay"
+        hand.stay = true
+      end
     end
 
-    puts "\nDo you want to (h)it, (s)tay or toggle (o)dds display?"
-    action = gets.chomp
-    puts
-
-    if action == "h"
-
-      puts "You chose to hit, here's your new hand"
-      hand.add_card(shoe.deal_card)
-      hand.say_cards
-
-    elsif action == "o"
-      $show_odds = !$show_odds
-    elsif action == "q"
-      break
-    else
-      puts "You chose to stay"
-      break
+    if hand.is_viable && dealer.get_valuez.max < 17
+      dealer.add_card(shoe.deal_card)
+      dealer.say_cards("Dealer")
+      dealer.say_value("Dealer")
     end
 
   end
@@ -536,36 +578,37 @@ def play_hand(shoe)
 
   puts
 
- if hand.get_valuez.count == 0
+  # Note: win rules taken from https://www.casinocenter.com/rules-strategy-blackjack
 
-   puts "You busted - womp, womp"
+  if dealer.get_valuez.count == 0 && hand.get_valuez.count == 0
+    puts "Both dealer and player busted - dealer wins"
+  elsif dealer.get_valuez.max == hand.get_valuez.max
+    puts "PUSH - money is returned"
+  elsif dealer.get_valuez.include? 21
+    puts "You lose! - dealer hit blackjack"
+  elsif dealer.is_viable == false
+    puts "You win! - dealer busted out"
+  elsif hand.get_valuez.count == 0
+    puts "You're busted - womp, womp"
+  elsif hand.get_valuez.include? 21
+    puts "You win! BLACKJACK"
+  elsif hand.num_cards >= hand.charlie_val
+    puts "You win! #{hand.charlie_val} CARD CHARLIE"
+  else
+    dealer_val = dealer.get_valuez.max
+    player_val = hand.get_valuez.max
 
- elsif hand.get_valuez.include? 21
-
-   puts "You win! BLACKJACK"
-
- elsif hand.num_cards >= hand.charlie_val
-
-   puts "You win! #{hand.charlie_val} CARD CHARLIE!"
-
- elsif
-
-   puts "Win indeterminate - This should never happen!"
- end
+    print "dealer: #{dealer_val} / player: #{player_val} - "
+    if dealer_val >= player_val
+      print "DEALER WINS!\n"
+    else
+      print "PLAYER WINS!\n"
+    end
+  end
 
 end
 
 shoe = Shoe.new(num_decks)
-
-num_cards_to_deal = 50
-puts "Dealing #{num_cards_to_deal} cards"
-
-for _ in 1..num_cards_to_deal do
-  shoe.deal_card
-end
-
-print("\n=============\n\n")
-
 play_hand(shoe)
 
 while true
@@ -576,7 +619,7 @@ while true
   elsif action == "r"
     shoe = Shoe.new(num_decks)
     play_hand(shoe)
-  elsif action == "n"
+  elsif action == "n" || action == "q"
     break
   else
     next
